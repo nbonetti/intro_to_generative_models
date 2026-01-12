@@ -10,9 +10,17 @@ Le papier examine l’hypothèse que le RL améliore parfois surtout la performa
 
 ## Objectif : échantillonner dans une distribution “accentuée”
 
-Au lieu d’échantillonner selon la distribution standard \(p(\text{réponse})\), la méthode cible une distribution de type :
+Au lieu d’échantillonner selon la distribution standard :
 
-- \(p(\text{réponse})^\alpha\) avec \(\alpha > 1\)
+$$
+p(\text{réponse})
+$$
+
+la méthode cible une distribution de type :
+
+$$
+p(\text{réponse})^\alpha \quad \text{avec } \alpha > 1
+$$
 
 Ce “power” renforce la masse de probabilité des séquences globalement plus plausibles et diminue celle des séquences moins plausibles. 
 
@@ -21,13 +29,13 @@ Ce “power” renforce la masse de probabilité des séquences globalement plus
 Le papier souligne que ce n’est pas équivalent à baisser la température, car :
 
 - la température agit localement (sur le prochain token),
-- la distribution \(p^\alpha\) agit globalement (sur la séquence complète).
+- la distribution $$p^\alpha$$ agit globalement (sur la séquence complète).
 
 Ils montrent que ces deux opérations induisent des distributions différentes et peuvent privilégier des choix distincts au cours de la génération. 
 
-## Méthode : Metropolis–Hastings (MCMC) pour générer selon \(p^\alpha\)
+## Méthode : Metropolis–Hastings (MCMC) pour générer selon $$p^\alpha$$
 
-Échantillonner directement \(p^\alpha\) est difficile car la normalisation sur l’espace de toutes les séquences est intractable. Les auteurs utilisent **Metropolis–Hastings (MCMC)** pour construire une chaîne dont la distribution stationnaire correspond à \(p^\alpha\). 
+Échantillonner directement $$p^\alpha$$ est difficile car la normalisation sur l’espace de toutes les séquences est intractable. Les auteurs utilisent **Metropolis–Hastings (MCMC)** pour construire une chaîne dont la distribution stationnaire correspond à $$p^\alpha$$. 
 
 ### Principe
 
@@ -84,10 +92,10 @@ Extraits (Table 1) :
 - **Concentration vs RL** : la procédure rapproche la génération de régions à haute vraisemblance, tandis que GRPO peut être encore plus concentré.   
 - **Longueur des solutions** : sur MATH500, la longueur moyenne des solutions peut devenir comparable à celle obtenue via GRPO, sans objectif explicite “écris plus long”.   
 - **Diversité (pass@k)** : GRPO tend à plafonner plus tôt (diversité plus faible), tandis que Power Sampling garde une meilleure progression du pass@k pour de grands k, suggérant une meilleure diversité tout en conservant de bonnes performances single-shot.   
-- **Hyperparamètres** : performances dépendantes de \(\alpha\) et du nombre d’itérations MCMC ; un \(\alpha\) intermédiaire et quelques étapes suffisent souvent avant stabilisation.   
+- **Hyperparamètres** : performances dépendantes de $$\alpha$$ et du nombre d’itérations MCMC ; un $$\alpha$$ intermédiaire et quelques étapes suffisent souvent avant stabilisation.   
 
 ## Implications et limites
 
 - **Test-time scaling** : transfert d’une partie des gains du RL vers du calcul à l’inférence (plusieurs propositions/acceptations internes).   
 - **Coût d’inférence** : amélioration contre un coût computationnel plus élevé au moment de répondre ; le papier discute ce compromis et le compare à l’ordre de grandeur d’un entraînement GRPO.   
-- **Po**
+- **Portée** : ne démontre pas que le RL est inutile ; montre qu’une part importante des gains peut être obtenue sans entraînement additionnel via un schéma d’échantillonnage adapté. 
