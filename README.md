@@ -1,158 +1,123 @@
 # Power Sampling: Latent Reasoning Extraction via MCMC
 
-This repository contains the implementation of **Power Sampling** on OPT-125M, demonstrating how to bypass greedy decoding limitations using a Metropolis-Hastings framework.
+This repository contains the implementation and experimental evaluation of **Power Sampling**, a training-free inference method designed to elicit hidden reasoning capabilities from Large Language Models (LLMs). By leveraging a **Metropolis-Hastings (MCMC)** framework, Power Sampling enables global optimization of sequence log-likelihood, allowing models to escape local optima and improve reasoning quality without additional training.
 
-##  Core Implementations
+---
+
+## Core Implementations
 
 ### 1. Linearity Analysis (Gap Test)
-* **File:** `powersamplingvs temperature`
-* **Purpose:** Validates Hypothesis **H1**. It compares Temperature scaling vs. Power Sampling ($\alpha$).
-* **Key Finding:** Confirms that Power Sampling scales the log-likelihood gap linearly, providing a more predictable sharpening tool than temperature.
+* **File:** `powersampling_vs_temperature`
+* **Purpose:** Validates Hypothesis **H1** by comparing Temperature Scaling with Power Sampling ($\alpha$).
+* **Key Finding:** Power Sampling scales the log-likelihood gap linearly, offering a more predictable sharpening mechanism than temperature adjustments.
 
-### 2. Performance Benchmark (Greedy vs. Power)
-* **File:** `greedy vs powersampling`
-* **Purpose:** Validates Hypothesis **H3**. It benchmarks standard Greedy Search against the Power Sampling global search.
-* **Key Finding:** Demonstrates that Greedy Search often falls into local optima (repetitive loops), while Power Sampling identifies significantly higher probability sequences.
+### 2. Performance Benchmark (Greedy vs. Power Sampling)
+* **File:** `greedy_vs_powersampling`
+* **Purpose:** Validates Hypothesis **H3** by benchmarking Greedy Search against Power Sampling.
+* **Key Finding:** Greedy Search often falls into repetitive loops (local optima), while Power Sampling identifies higher-probability sequences, improving overall performance.
 
 ### 3. MCMC Transition Kernel (H2 Optimization)
-* **File:** ` mcmc`
-* **Purpose:** Implements the core **Metropolis-Hastings** block-wise algorithm to optimize sequence coherence.
-* **Features:** * `compute_log_likelihood`: Joint probability calculation.
-    * `run_correction_tracker`: Iterative refinement using a sharpened target $p(x)^\alpha$.
-    * **Acceptance Logic:** Uses $\alpha=16$ to strictly filter and "lock" high-probability reasoning steps.
+* **File:** `mcmc`
+* **Purpose:** Implements the **Metropolis-Hastings** algorithm to optimize sequence coherence.
+* **Key Features:**
+  - `compute_log_likelihood`: Calculates joint probabilities for sequences.
+  - `run_correction_tracker`: Iteratively refines sequences using a sharpened target distribution $p(x)^\alpha$.
+  - **Acceptance Logic:** Uses $\alpha=16$ to prioritize high-probability reasoning steps.
 
-
-
+---
 
 # Reasoning with Sampling: Your Base Model is Smarter Than You Think (arXiv:2510.14901)
 
-Ce papier défend l’idée qu’on peut obtenir une grande partie des gains des modèles “reasoning” post-entraînés (RL) **sans ré-entraîner** le modèle, en utilisant une stratégie d’inférence basée sur un échantillonnage plus intelligent (“Power Sampling”). 
+This paper argues that significant reasoning improvements can be achieved in LLMs without additional training, by employing an inference strategy based on **Power Sampling**.
 
-## Contexte
+## Context
 
-Les modèles de langage génèrent des réponses par échantillonnage token par token. Pour améliorer les performances sur des tâches de raisonnement (maths, code, science), une approche standard est le post-entraînement par renforcement (RL) : générer des sorties, évaluer celles qui réussissent, et pousser le modèle à produire plus souvent ces sorties. 
-
-Le papier examine l’hypothèse que le RL améliore parfois surtout la performance en **repondérant** des sorties déjà présentes dans le modèle de base (augmentation de la probabilité de bonnes trajectoires), plutôt qu’en ajoutant de nouvelles capacités. 
-
-## Objectif : échantillonner dans une distribution “accentuée”
-
-Au lieu d’échantillonner selon la distribution standard :
+Language models generate responses token by token. To improve reasoning tasks (e.g., math, code, science), reinforcement learning (RL) is often used to fine-tune models. However, the paper hypothesizes that RL primarily **reweights** existing outputs rather than introducing new capabilities. Power Sampling achieves similar gains by targeting a sharpened distribution:
 
 $$
-p(\text{réponse})
+p(\text{response})^\alpha \quad \text{with } \alpha > 1
 $$
 
-la méthode cible une distribution de type :
+This approach amplifies the probability of plausible sequences while suppressing less likely ones.
 
-$$
-p(\text{réponse})^\alpha \quad \text{avec } \alpha > 1
-$$
+### Why Not Just Lower the Temperature?
 
-Ce “power” renforce la masse de probabilité des séquences globalement plus plausibles et diminue celle des séquences moins plausibles. 
+Unlike temperature scaling, which operates locally (token-level), Power Sampling modifies the global sequence distribution. The paper demonstrates that these two methods yield distinct outcomes, with Power Sampling offering better control over sequence plausibility.
 
-### Différence avec la température
+---
 
-Le papier souligne que ce n’est pas équivalent à baisser la température, car :
+## Methodology: Metropolis-Hastings (MCMC) for Sampling $$p^\alpha$$
 
-- la température agit localement (sur le prochain token),
-- la distribution $$p^\alpha$$ agit globalement (sur la séquence complète).
+Direct sampling from $$p^\alpha$$ is computationally intractable. The authors use **Metropolis-Hastings (MCMC)** to approximate this distribution.
 
-Ils montrent que ces deux opérations induisent des distributions différentes et peuvent privilégier des choix distincts au cours de la génération. 
+### Key Steps:
+1. Start with a current sequence.
+2. Propose a candidate sequence.
+3. Accept or reject the candidate based on Metropolis-Hastings rules.
+4. Repeat for multiple iterations to refine the sequence.
 
-## Méthode : Metropolis–Hastings (MCMC) pour générer selon $$p^\alpha$$
+### Autoregressive Adaptation:
+Instead of resampling entire sequences, the method:
+- Selects a position in the sequence.
+- Resamples a suffix or block.
+- Applies the Metropolis-Hastings acceptance ratio.
 
-Échantillonner directement $$p^\alpha$$ est difficile car la normalisation sur l’espace de toutes les séquences est intractable. Les auteurs utilisent **Metropolis–Hastings (MCMC)** pour construire une chaîne dont la distribution stationnaire correspond à $$p^\alpha$$. 
+---
 
-### Principe
+## Evaluation
 
-1. partir d’une séquence courante,
-2. proposer une nouvelle séquence candidate,
-3. accepter/rejeter la candidate selon une règle d’acceptation Metropolis–Hastings,
-4. répéter plusieurs itérations, puis retourner la séquence finale.
+### Benchmarks:
+- **Datasets:** MATH500, HumanEval, GPQA Diamond, AlpacaEval 2.0.
+- **Models:** Qwen2.5-Math-7B, Qwen2.5-7B, Phi-3.5-mini-instruct.
+- **Baseline:** GRPO (Reinforcement Learning post-training on MATH).
 
-### Adaptation autoregressive
+### Results:
+Power Sampling consistently improves base model performance, often surpassing low-temperature baselines and approaching or exceeding GRPO in some cases.
 
-Plutôt que de resampler toute la séquence, la proposition consiste typiquement à :
-
-- choisir une position dans la séquence,
-- resampler un suffixe (ou un bloc) via une distribution de proposition,
-- appliquer le ratio d’acceptation MH.
-
-Ils décrivent un schéma **Autoregressive MCMC** (Algorithme 1) et discutent l’usage de distributions intermédiaires pour améliorer le mélange de la chaîne. 
-
-## Évaluation
-
-Benchmarks (single-shot) :
-
-- **MATH500**   
-- **HumanEval**   
-- **GPQA Diamond**   
-- **AlpacaEval 2.0**   
-
-Modèles : **Qwen2.5-Math-7B**, **Qwen2.5-7B**, **Phi-3.5-mini-instruct**.  
-Baseline RL : **GRPO** (post-training sur MATH). 
-
-## Résultats (points saillants)
-
-La méthode **Power Sampling** :
-
-- améliore nettement le modèle de base,
-- dépasse souvent une baseline “low-temperature”,
-- se rapproche de GRPO et peut le dépasser selon le modèle/la tâche. 
-
-Extraits (Table 1) :
-
+#### Highlights (Table 1):
 - **Qwen2.5-Math-7B**
-  - MATH500 : 0.496 → 0.748 (GRPO 0.785)
-  - HumanEval : 0.329 → 0.573 (GRPO 0.537)
-  - GPQA : 0.278 → 0.389 (GRPO 0.399) 
-
-- **Qwen2.5-7B**
-  - HumanEval : 0.329 → 0.622 (GRPO 0.561) 
-
+  - MATH500: 0.496 → 0.748 (GRPO: 0.785)
+  - HumanEval: 0.329 → 0.573 (GRPO: 0.537)
 - **Phi-3.5-mini-instruct**
-  - HumanEval : 0.213 → 0.732 (GRPO 0.134) 
+  - HumanEval: 0.213 → 0.732 (GRPO: 0.134)
 
-## Analyse
+---
 
-- **Concentration vs RL** : la procédure rapproche la génération de régions à haute vraisemblance, tandis que GRPO peut être encore plus concentré.   
-- **Longueur des solutions** : sur MATH500, la longueur moyenne des solutions peut devenir comparable à celle obtenue via GRPO, sans objectif explicite “écris plus long”.   
-- **Diversité (pass@k)** : GRPO tend à plafonner plus tôt (diversité plus faible), tandis que Power Sampling garde une meilleure progression du pass@k pour de grands k, suggérant une meilleure diversité tout en conservant de bonnes performances single-shot.   
-- **Hyperparamètres** : performances dépendantes de $$\alpha$$ et du nombre d’itérations MCMC ; un $$\alpha$$ intermédiaire et quelques étapes suffisent souvent avant stabilisation.   
+## Analysis
 
-## Implications et limites
+- **Concentration vs. RL:** Power Sampling focuses on high-likelihood regions, similar to RL, but without additional training.
+- **Solution Lengths:** Comparable to GRPO on MATH500, without explicitly optimizing for length.
+- **Diversity (pass@k):** Maintains diversity at higher k values, outperforming GRPO in some scenarios.
+- **Hyperparameters:** Performance stabilizes with intermediate $$\alpha$$ values and a few MCMC iterations.
 
-- **Test-time scaling** : transfert d’une partie des gains du RL vers du calcul à l’inférence (plusieurs propositions/acceptations internes).   
-- **Coût d’inférence** : amélioration contre un coût computationnel plus élevé au moment de répondre ; le papier discute ce compromis et le compare à l’ordre de grandeur d’un entraînement GRPO.   
-- **Portée** : ne démontre pas que le RL est inutile ; montre qu’une part importante des gains peut être obtenue sans entraînement additionnel via un schéma d’échantillonnage adapté. 
+---
 
-# Power Sampling: Latent Reasoning Extraction via MCMC
+## Implications and Limitations
 
-This repository contains the implementation and experimental evaluation of **Power Sampling**, a training-free inference method designed to elicit hidden reasoning capabilities from Large Language Models (LLMs).
+- **Test-Time Scaling:** Shifts some RL benefits to inference time, requiring additional computational resources during response generation.
+- **Inference Cost:** Higher computational cost compared to standard decoding, but significantly lower than RL training.
+- **Scope:** Demonstrates that RL is not always necessary for reasoning improvements, but does not claim to replace RL entirely.
 
-##  Project Overview
+---
 
-Power Sampling leverages a **Metropolis-Hastings (MCMC)** transition kernel to sample from a "sharpened" distribution $p(x)^\alpha$. Unlike standard greedy decoding or temperature scaling, this method performs a global optimization of the sequence log-likelihood. This allows the model to escape local optima (greedy traps) and "correct" its own factual or logical errors during inference.
-
-
-
-##  Project Structure
-
-The project is organized into three main pillars corresponding to our research hypotheses (H1, H2, H3):
+## Project Structure
 
 ### 1. Toy World & Theoretical Validation (`/toy_model`)
-A controlled synthetic environment used to validate the mathematical foundations of the algorithm.
+A controlled environment to validate the algorithm's mathematical foundations.
 * **Key Components:** Convergence diagnostics (KL Divergence, Total Variation distance), *pass@k* analysis.
-* **Objective:** To prove that the MCMC kernel converges to the target distribution and to analyze the impact of block sizes on mixing efficiency.
+* **Objective:** Prove MCMC kernel convergence and analyze block size impact on mixing efficiency.
 
 ### 2. Linearity Analysis & Benchmarks (`/experiments`)
 Comparative tests on distributional properties and decoding performance.
-* **`temperature vs power sampling` (H1):** Compares the impact of $\alpha$ (Power Sampling) vs. $T$ (Temperature Scaling). Demonstrates that $\alpha$ preserves the relative geometry of the distribution linearly.
-* **`greedy vs powersampling` (H3):** A direct benchmark between standard Greedy Search and Power Sampling on logic-based prompts.
+* **`temperature_vs_power_sampling` (H1):** Compares $\alpha$ (Power Sampling) with $T$ (Temperature Scaling).
+* **`greedy_vs_powersampling` (H3):** Benchmarks Greedy Search against Power Sampling on logic-based prompts.
 
 ### 3. Core MCMC Optimizer (`mcmc`)
 The main algorithmic engine applied to the **OPT-125M** model.
-* **`compute_log_likelihood`:** Calculates the joint probability of a sequence using the model's cross-entropy loss.
-* **`run_correction_tracker`:** Iterative Metropolis-Hastings implementation with step-by-step acceptance/rejection logging.
-* **Key Hyperparameters:** $\alpha=16$ for strict filtering of high-probability reasoning chains and a `block_size=15` for effective state transitions.
+* **`compute_log_likelihood`:** Calculates sequence probabilities.
+* **`run_correction_tracker`:** Implements Metropolis-Hastings with detailed logging.
+* **Key Hyperparameters:** $\alpha=16$, `block_size=15`.
 
+---
+
+Power Sampling provides a novel, training-free approach to enhance reasoning in LLMs, bridging the gap between standard decoding and reinforcement learning.
