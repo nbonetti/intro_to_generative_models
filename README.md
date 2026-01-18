@@ -26,7 +26,7 @@ This repository contains the implementation and experimental evaluation of **Pow
 
 ---
 
-# Reasoning with Sampling: Your Base Model is Smarter Than You Think (arXiv:2510.14901)
+# Reasoning with Sampling: Your Base Model is Smarter Than You Think 
 
 This paper argues that significant reasoning improvements can be achieved in LLMs without additional training, by employing an inference strategy based on **Power Sampling**.
 
